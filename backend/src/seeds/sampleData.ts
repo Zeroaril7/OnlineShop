@@ -1,4 +1,6 @@
+import bcrypt from 'bcryptjs';
 import { Product } from '../models/Product.js';
+import { User } from '../models/User.js';
 
 export const initialProducts = [
   {
@@ -23,10 +25,45 @@ export const initialProducts = [
   }
 ];
 
+export const initialUsers = [
+  {
+    name: 'Administrator',
+    email: 'admin@onlineshop.com',
+    plainPassword: 'admin123',
+    role: 'admin' as const
+  },
+  {
+    name: 'Demo User',
+    email: 'user@onlineshop.com',
+    plainPassword: 'user123',
+    role: 'user' as const
+  }
+];
+
 export const autoSeedIfEmpty = async (): Promise<void> => {
-  const count = await Product.countDocuments();
-  if (count === 0) {
+  let seeded = false;
+
+  const productCount = await Product.countDocuments();
+  if (productCount === 0) {
     await Product.insertMany(initialProducts);
-    console.log(`🌱 Database kosong. Berhasil menanam (auto-seed) ${initialProducts.length} sample data produk.`);
+    seeded = true;
+  }
+
+  for (const u of initialUsers) {
+    const existing = await User.findOne({ email: u.email });
+    if (!existing) {
+      const hashedPassword = await bcrypt.hash(u.plainPassword, 10);
+      await User.create({
+        name: u.name,
+        email: u.email,
+        password: hashedPassword,
+        role: u.role
+      });
+      seeded = true;
+    }
+  }
+
+  if (seeded) {
+    console.log('Database seeded successfully');
   }
 };

@@ -1,9 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { Product } from '../models/Product.js';
+import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 
 const router = Router();
 
-// GET: Ambil semua data produk
+// GET: Ambil semua data produk (Publik)
 router.get('/', async (_req: Request, res: Response): Promise<void> => {
   try {
     const products = await Product.find().sort({ createdAt: -1 });
@@ -13,7 +14,7 @@ router.get('/', async (_req: Request, res: Response): Promise<void> => {
   }
 });
 
-// GET: Ambil satu produk by ID
+// GET: Ambil satu produk by ID (Publik)
 router.get('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const product = await Product.findById(req.params.id);
@@ -27,8 +28,44 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-// POST: Tambah produk baru
-router.post('/', async (req: Request, res: Response): Promise<void> => {
+// POST: Beli produk (Pengguna Terautentikasi)
+router.post('/:id/buy', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { quantity } = req.body;
+    const qty = Number(quantity);
+
+    if (!qty || qty <= 0) {
+      res.status(400).json({ message: 'Jumlah pembelian harus minimal 1 unit' });
+      return;
+    }
+
+    const product = await Product.findById(req.params.id);
+    if (!product) {
+      res.status(404).json({ message: 'Produk tidak ditemukan' });
+      return;
+    }
+
+    if (product.stock < qty) {
+      res.status(400).json({ message: `Stok tidak mencukupi. Stok saat ini: ${product.stock} unit` });
+      return;
+    }
+
+    product.stock -= qty;
+    const updatedProduct = await product.save();
+
+    res.status(200).json({
+      message: 'Pembelian berhasil diproses',
+      product: updatedProduct,
+      purchasedQuantity: qty,
+      totalCost: qty * updatedProduct.price
+    });
+  } catch (error) {
+    res.status(500).json({ message: (error as Error).message });
+  }
+});
+
+// POST: Tambah produk baru (Hanya Admin)
+router.post('/', authenticateToken, requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { name, description, price, category, imageUrl, stock } = req.body;
     const newProduct = new Product({
@@ -46,8 +83,8 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-// PUT: Perbarui data produk
-router.put('/:id', async (req: Request, res: Response): Promise<void> => {
+// PUT: Perbarui data produk (Hanya Admin)
+router.put('/:id', authenticateToken, requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const updated = await Product.findByIdAndUpdate(
       req.params.id,
@@ -64,8 +101,8 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-// DELETE: Hapus produk
-router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
+// DELETE: Hapus produk (Hanya Admin)
+router.delete('/:id', authenticateToken, requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const deleted = await Product.findByIdAndDelete(req.params.id);
     if (!deleted) {

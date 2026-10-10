@@ -19,10 +19,12 @@ Aplikasi web e-commerce modern berbasis full-stack. Menyediakan antarmuka katalo
 
 | Component | Technology | Description |
 |---|---|---|
-| **Frontend** | React 19, TypeScript, React Router 7, Vite | Single Page Application (SPA), Flexbox & CSS Grid, Axios client |
+| **Frontend** | React 19, TypeScript, React Router 7, Vite | Single Page Application (SPA), Flexbox & CSS Grid, Axios client, LogRocket monitoring |
 | **Frontend Server** | Nginx Alpine | Production web server & reverse proxy untuk internal routing |
-| **Backend API** | Node.js, Express 5, TypeScript | RESTful API modular, Mongoose ODM |
-| **Database** | MongoDB | Document-based NoSQL database |
+| **Backend API** | Node.js, Express 5, TypeScript | RESTful API modular, JWT Auth (`jsonwebtoken`), `bcryptjs`, Mongoose ODM |
+| **Database** | MongoDB / MongoDB Atlas | Document-based NoSQL database |
+| **Keamanan & Auth** | JWT & Bcrypt | Password hashing, Bearer token verification, route protection (`ProtectedRoute`) |
+| **Monitoring** | LogRocket & Google Analytics (GA4) | User session recording, performance tracking, real-time analytics |
 | **Containerization** | Docker & Docker Compose | Multi-container setup terisolasi pada network `shop_net` |
 
 ---
@@ -175,14 +177,27 @@ npm run dev
 
 ### RESTful API Endpoints
 
-| Method | Endpoint | Description | Request Body |
-|---|---|---|---|
-| `GET` | `/api/products` | Fetch all products list | None |
-| `GET` | `/api/products/:id` | Fetch product details by ID | None |
-| `POST` | `/api/products` | Create a new product | JSON (`name`, `price`, `category`, `stock`, `description`, `imageUrl`) |
-| `PUT` | `/api/products/:id` | Update product details | JSON *(supports partial updates)* |
-| `DELETE` | `/api/products/:id` | Delete product by ID | None |
+#### Autentikasi Pengguna (`/api/auth`)
 
+| Method | Endpoint | Akses | Description | Request Body |
+|---|---|---|---|---|
+| `POST` | `/api/auth/register` | Publik | Registrasi akun baru | JSON (`name`, `email`, `password`) |
+| `POST` | `/api/auth/login` | Publik | Login & dapatkan token JWT | JSON (`email`, `password`) |
+| `GET` | `/api/auth/me` | **Bearer Token** | Verifikasi token & ambil profil | Header `Authorization: Bearer <token>` |
+
+> **Akun Default Seeder:**
+> * **Admin:** `admin@onlineshop.com` | Password: `admin123`
+> * **User Demo:** `user@onlineshop.com` | Password: `user123`
+
+#### Manajemen Produk (`/api/products`)
+
+| Method | Endpoint | Akses | Description | Request Body |
+|---|---|---|---|---|
+| `GET` | `/api/products` | Publik | Ambil semua produk katalog | None |
+| `GET` | `/api/products/:id` | Publik | Ambil detail satu produk | None |
+| `POST` | `/api/products` | **Bearer Token** | Tambah produk baru | JSON (`name`, `price`, `category`, `stock`, `description`, `imageUrl`) |
+| `PUT` | `/api/products/:id` | **Bearer Token** | Perbarui data produk | JSON *(mendukung update parsial)* |
+| `DELETE` | `/api/products/:id` | **Bearer Token** | Hapus produk | None |
 ---
 
 ## Database Seeding
