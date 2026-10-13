@@ -12,17 +12,19 @@ Aplikasi web e-commerce modern berbasis full-stack. Menyediakan antarmuka katalo
 - [Option 2: Manual Setup (Local Development)](#option-2-manual-setup-local-development)
 - [Service URLs & API Endpoints](#service-urls--api-endpoints)
 - [Database Seeding](#database-seeding)
-
+- [Proxy API Cloud Hosting (Opsional)](#proxy-api-cloud-hosting-opsional)
 ---
 
 ## Tech Stack
 
 | Component | Technology | Description |
 |---|---|---|
-| **Frontend** | React 19, TypeScript, React Router 7, Vite | Single Page Application (SPA), Flexbox & CSS Grid, Axios client |
+| **Frontend** | React 19, TypeScript, React Router 7, Vite | Single Page Application (SPA), Flexbox & CSS Grid, Axios client, LogRocket monitoring |
 | **Frontend Server** | Nginx Alpine | Production web server & reverse proxy untuk internal routing |
-| **Backend API** | Node.js, Express 5, TypeScript | RESTful API modular, Mongoose ODM |
-| **Database** | MongoDB | Document-based NoSQL database |
+| **Backend API** | Node.js, Express 5, TypeScript | RESTful API modular, JWT Auth (`jsonwebtoken`), `bcryptjs`, Mongoose ODM |
+| **Database** | MongoDB / MongoDB Atlas | Document-based NoSQL database |
+| **Keamanan & Auth** | JWT & Bcrypt | Password hashing, Bearer token verification, route protection (`ProtectedRoute`) |
+| **Monitoring** | LogRocket & Google Analytics (GA4) | User session recording, performance tracking, real-time analytics |
 | **Containerization** | Docker & Docker Compose | Multi-container setup terisolasi pada network `shop_net` |
 
 ---
@@ -175,14 +177,27 @@ npm run dev
 
 ### RESTful API Endpoints
 
-| Method | Endpoint | Description | Request Body |
-|---|---|---|---|
-| `GET` | `/api/products` | Fetch all products list | None |
-| `GET` | `/api/products/:id` | Fetch product details by ID | None |
-| `POST` | `/api/products` | Create a new product | JSON (`name`, `price`, `category`, `stock`, `description`, `imageUrl`) |
-| `PUT` | `/api/products/:id` | Update product details | JSON *(supports partial updates)* |
-| `DELETE` | `/api/products/:id` | Delete product by ID | None |
+#### Autentikasi Pengguna (`/api/auth`)
 
+| Method | Endpoint | Akses | Description | Request Body |
+|---|---|---|---|---|
+| `POST` | `/api/auth/register` | Publik | Registrasi akun baru | JSON (`name`, `email`, `password`) |
+| `POST` | `/api/auth/login` | Publik | Login & dapatkan token JWT | JSON (`email`, `password`) |
+| `GET` | `/api/auth/me` | **Bearer Token** | Verifikasi token & ambil profil | Header `Authorization: Bearer <token>` |
+
+> **Akun Default Seeder:**
+> * **Admin:** `admin@onlineshop.com` | Password: `admin123`
+> * **User Demo:** `user@onlineshop.com` | Password: `user123`
+
+#### Manajemen Produk (`/api/products`)
+
+| Method | Endpoint | Akses | Description | Request Body |
+|---|---|---|---|---|
+| `GET` | `/api/products` | Publik | Ambil semua produk katalog | None |
+| `GET` | `/api/products/:id` | Publik | Ambil detail satu produk | None |
+| `POST` | `/api/products` | **Bearer Token** | Tambah produk baru | JSON (`name`, `price`, `category`, `stock`, `description`, `imageUrl`) |
+| `PUT` | `/api/products/:id` | **Bearer Token** | Perbarui data produk | JSON *(mendukung update parsial)* |
+| `DELETE` | `/api/products/:id` | **Bearer Token** | Hapus produk | None |
 ---
 
 ## Database Seeding
@@ -201,3 +216,49 @@ Aplikasi dilengkapi dataset sample produk awal (*Monitor Skyworth 240Hz* & *Ugre
      ```bash
      cd backend && npm run seed:dev
      ```
+
+---
+
+## Proxy API Cloud Hosting (Opsional)
+
+Konfigurasi proxy hanya diperlukan jika frontend di-deploy di cloud berprotokol **HTTPS** sedangkan backend VPS masih berjalan dengan **HTTP** (untuk mencegah pemblokiran *Mixed Content* oleh browser).
+
+#### Opsi 1: Proxy di Netlify (`netlify.toml` di root)
+
+```toml
+[[redirects]]
+  from = "/api/*"
+  to = "http://IP_VPS_ANDA:PORT/api/:splat"
+  status = 200
+  force = true
+```
+
+#### Opsi 2: Proxy di Vercel (`vercel.json` di root atau frontend)
+
+```json
+{
+  "rewrites": [
+    {
+      "source": "/api/:match*",
+      "destination": "http://IP_VPS_ANDA:PORT/api/:match*"
+    }
+  ]
+}
+```
+---
+
+### Pengaturan Environment Variable Frontend (`VITE_API_URL`)
+
+Karena semua service API frontend (`frontend/src/services/api.ts`) sudah memanggil path diawali `/api/` (contoh: `/api/products`, `/api/auth/login`):
+
+| Platform Setting | Nilai yang Disarankan | Penjelasan |
+|---|---|---|
+| **Netlify / Vercel Env** | *(Kosongkan / Jangan dibuat)* | Variable akan bernilai `undefined` dan otomatis fallback ke string kosong `""`. Axios akan mengirim request relatif (`/api/...`) ke domain hosting itu sendiri, lalu diteruskan oleh rewrite rule ke VPS. |
+| **Alternatif Eksplisit** | `https://domain-anda.netlify.app` | Isi dengan domain frontend Anda sendiri. **Jangan diisi `/api`** (agar tidak menjadi `/api/api/...`). |
+
+---
+
+### Checklist Firewall & CORS VPS
+
+1. **Firewall VPS:** Pastikan port backend (default: `5000`) sudah diizinkan menerima traffic masuk (*allow inbound*).
+2. **CORS Backend:** Backend Express sudah menggunakan middleware `cors()`, pastikan tidak ada reverse-proxy OS/Firewall yang memblokir header `Authorization` (Bearer token).

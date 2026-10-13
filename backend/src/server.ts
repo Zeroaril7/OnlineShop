@@ -4,10 +4,11 @@ import mongoose from 'mongoose';
 import path from 'path';
 import dotenv from 'dotenv';
 import productRoutes from './routes/productRoutes.js';
+import authRoutes from './routes/authRoutes.js';
 import { autoSeedIfEmpty } from './seeds/sampleData.js';
 
-dotenv.config();
-dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
+dotenv.config({ quiet: true });
+dotenv.config({ path: path.resolve(process.cwd(), '../.env'), quiet: true });
 
 const app = express();
 const PORT = Number(process.env.BACKEND_PORT || process.env.PORT) || 5000;
@@ -18,7 +19,7 @@ app.use(express.json());
 
 // Routes
 app.use('/api/products', productRoutes);
-
+app.use('/api/auth', authRoutes);
 // Health check endpoint
 app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'OK', message: 'Online Shop Backend Ready' });
@@ -28,13 +29,12 @@ app.get('/health', (_req, res) => {
 mongoose
   .connect(MONGO_URI)
   .then(async () => {
-    console.log('✅ Berhasil terkoneksi ke MongoDB (online_shop)');
     await autoSeedIfEmpty();
     app.listen(PORT, () => {
-      console.log(`🚀 Backend server berjalan di http://localhost:${PORT}`);
+      console.log(`Server running on port ${PORT}`);
     });
   })
   .catch((err) => {
-    console.error('❌ Gagal koneksi ke MongoDB:', err);
+    console.error('Database connection error:', err);
     process.exit(1);
   });

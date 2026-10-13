@@ -1,34 +1,38 @@
 import path from 'path';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
+import bcrypt from 'bcryptjs';
 import { Product } from './models/Product.js';
-import { initialProducts } from './seeds/sampleData.js';
+import { User } from './models/User.js';
+import { initialProducts, initialUsers } from './seeds/sampleData.js';
 
-dotenv.config();
-dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
-
+dotenv.config({ quiet: true });
+dotenv.config({ path: path.resolve(process.cwd(), '../.env'), quiet: true });
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/online_shop';
 
 const runSeed = async () => {
   try {
-    console.log('🔄 Menghubungkan ke MongoDB untuk seeding...');
     await mongoose.connect(MONGO_URI);
-    console.log('✅ Terhubung ke MongoDB.');
 
     await Product.deleteMany({});
-    console.log('🧹 Menghapus koleksi produk lama...');
+    await Product.insertMany(initialProducts);
 
-    const inserted = await Product.insertMany(initialProducts);
-    console.log(`🌱 Sukses memasukkan ${inserted.length} data produk sample:`);
-    inserted.forEach((p, idx) => {
-      console.log(`   ${idx + 1}. [${p.category}] ${p.name} - Rp ${p.price.toLocaleString('id-ID')}`);
-    });
+    await User.deleteMany({});
+    for (const u of initialUsers) {
+      const hashedPassword = await bcrypt.hash(u.plainPassword, 10);
+      await User.create({
+        name: u.name,
+        email: u.email,
+        password: hashedPassword,
+        role: u.role
+      });
+    }
 
     await mongoose.disconnect();
-    console.log('🏁 Seeding selesai dengan sukses.');
+    console.log('Database seeded successfully');
     process.exit(0);
   } catch (error) {
-    console.error('❌ Gagal melakukan seeding:', error);
+    console.error('Seeding failed:', error);
     process.exit(1);
   }
 };
